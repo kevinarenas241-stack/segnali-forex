@@ -40,19 +40,27 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def check_entry_signal(last_row, hour_utc: int):
+def check_entry_signal(last_row, hour_utc: int, rsi_oversold: float = RSI_OVERSOLD,
+                        rsi_overbought: float = RSI_OVERBOUGHT, sl_atr_mult: float = SL_ATR_MULT):
     """Ritorna (direction, stop_loss) o (None, None). last_row: ultima riga
-    del DataFrame arricchito da add_indicators (Serie pandas)."""
+    del DataFrame arricchito da add_indicators (Serie pandas).
+
+    rsi_oversold/rsi_overbought/sl_atr_mult: valori di default gia' validati
+    (le costanti di modulo), ma sovrascrivibili - li passa signal_engine.py
+    leggendoli da segnali_status.json ("active_params"), l'UNICO modo in cui
+    la revisione AI puo' effettivamente cambiare il comportamento della
+    strategia (mai modificando questo file), e solo entro i limiti fissi
+    imposti da ai_review.py (questo modulo non li conosce e non li applica)."""
     if pd.isna(last_row["bb_lower"]) or pd.isna(last_row["bb_upper"]) or pd.isna(last_row["rsi"]) or pd.isna(last_row["atr"]):
         return None, None
     if not (SESSION_START <= hour_utc < SESSION_END):
         return None, None
 
     close = last_row["close"]
-    if close < last_row["bb_lower"] and last_row["rsi"] < RSI_OVERSOLD:
-        return "LONG", close - SL_ATR_MULT * last_row["atr"]
-    if close > last_row["bb_upper"] and last_row["rsi"] > RSI_OVERBOUGHT:
-        return "SHORT", close + SL_ATR_MULT * last_row["atr"]
+    if close < last_row["bb_lower"] and last_row["rsi"] < rsi_oversold:
+        return "LONG", close - sl_atr_mult * last_row["atr"]
+    if close > last_row["bb_upper"] and last_row["rsi"] > rsi_overbought:
+        return "SHORT", close + sl_atr_mult * last_row["atr"]
     return None, None
 
 

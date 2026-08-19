@@ -47,3 +47,19 @@ def close_signal(symbol: str, exit_price: float, pnl_eur: float, pnl_pct: float,
 
 def heartbeat() -> None:
     _post("heartbeat")
+
+
+def set_strategy_note(text: str) -> None:
+    _post("note", data={"text": text})
+
+
+def mark_reviewed(count: int) -> None:
+    _post("mark_reviewed", data={"count": count})
+
+
+def apply_param_change(param: str, new_value: float, reasoning: str) -> None:
+    _post("apply_param_change", data={"param": param, "new_value": new_value, "reasoning": reasoning})
+
+
+def flag_strategy_concern(text: str) -> None:
+    _post("flag_strategy_concern", data={"text": text})

@@ -23,6 +23,7 @@ from twelvedata_client import fetch_ohlc
 from telegram_client import send_message
 from dashboard_client import get_status, open_signal, close_signal, heartbeat
 from mean_reversion import add_indicators, check_entry_signal, check_exit
+from ai_review import run_review_if_due
 
 SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "EURGBP", "USDCHF", "AUDUSD"]
 RISK_PCT = 0.003
@@ -64,9 +65,25 @@ def _process_open_signal(symbol, open_pos, last, current_capital):
     )
     print(f"[{symbol}] chiuso: {reason}, pnl={pnl_eur:.2f}EUR ({pnl_pct:.2f}%)")
 
+    # Controllo economico (nessuna chiamata AI a meno che non sia davvero
+    # dovuta - vedi ai_review.run_review_if_due) dopo ogni chiusura, cosi'
+    # come richiesto: reattivo, ma senza giudicare la strategia su un
+    # singolo trade in piu'. Isolato in un try/except tutto suo: un problema
+    # qui non deve mai far sembrare fallita la chiusura dell'operazione,
+    # gia' registrata con successo sopra.
+    try:
+        run_review_if_due()
+    except Exception as e:
+        print(f"[{symbol}] revisione AI non riuscita (la chiusura resta comunque valida): {e}")
 
-def _process_new_signal(symbol, last, hour_utc, current_capital):
-    direction, stop_loss = check_entry_signal(last, hour_utc)
+
+def _process_new_signal(symbol, last, hour_utc, current_capital, active_params):
+    direction, stop_loss = check_entry_signal(
+        last, hour_utc,
+        rsi_oversold=active_params.get("rsi_oversold", 30),
+        rsi_overbought=active_params.get("rsi_overbought", 70),
+        sl_atr_mult=active_params.get("sl_atr_mult", 1.5),
+    )
     if direction is None:
         rsi = last["rsi"]
         rsi_str = f"{rsi:.1f}" if rsi == rsi else "n/d"  # rsi != rsi se e' NaN
@@ -92,6 +109,10 @@ def main():
     status = get_status()
     current_capital = status.get("current_capital", 10000.0)
     open_signals = status.get("open_signals", {})
+    # parametri "vivi": normalmente i default validati, ma se la revisione AI
+    # ne ha applicato uno (entro i suoi limiti fissi - vedi ai_review.py)
+    # arriva da qui, letto fresco ad ogni esecuzione.
+    active_params = status.get("active_params", {})
 
     for symbol in SYMBOLS:
         try:
@@ -102,7 +123,7 @@ def main():
             if symbol in open_signals:
                 _process_open_signal(symbol, open_signals[symbol], last, current_capital)
             else:
-                _process_new_signal(symbol, last, hour_utc, current_capital)
+                _process_new_signal(symbol, last, hour_utc, current_capital, active_params)
         except Exception as e:
             print(f"[{symbol}] ERRORE: {e}")
 
