@@ -1,0 +1,29 @@
+name: Segnali forex
+
+on:
+  schedule:
+    # 2 minuti dopo ogni chiusura di barra M15 (00/15/30/45), per dare tempo
+    # a Twelve Data di pubblicare la candela appena chiusa.
+    - cron: "2,17,32,47 * * * *"
+  workflow_dispatch: {}  # permette anche un avvio manuale da GitHub, per test
+
+jobs:
+  run-signal-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installa le dipendenze
+        run: pip install -r requirements.txt
+
+      - name: Esegui il motore dei segnali
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEGNALI_API_KEY: ${{ secrets.SEGNALI_API_KEY }}
+        run: python signal_engine.py
