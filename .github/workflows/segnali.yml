@@ -31,7 +31,7 @@ jobs:
       - name: Installa le dipendenze
         run: pip install -r requirements.txt
 
-      - name: Esegui il motore dei segnali in loop (ogni ~15 minuti, per ~5h30 ad ogni avvio)
+      - name: Esegui il motore dei segnali in loop, agganciato alla vera chiusura delle candele M15
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -39,10 +39,24 @@ jobs:
           SEGNALI_API_KEY: ${{ secrets.SEGNALI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          for i in $(seq 1 22); do
-            echo "=== Ciclo $i/22 - $(date -u +'%Y-%m-%d %H:%M:%S UTC') ==="
+          # Resta acceso ~5h30 (margine sotto il limite di 6h di GitHub) e ad
+          # ogni ciclo dorme ESATTAMENTE fino a 2 minuti dopo il prossimo vero
+          # confine di barra M15 (00/15/30/45 UTC) - non una sleep fissa, che
+          # accumulerebbe uno scarto nel tempo fino a controllare prima ancora
+          # che la candela sia chiusa. Il primo ciclo parte subito.
+          run_until=$(( $(date -u +%s) + 330 * 60 ))
+          i=1
+          while [ "$(date -u +%s)" -lt "$run_until" ]; do
+            echo "=== Ciclo $i - $(date -u +'%Y-%m-%d %H:%M:%S UTC') ==="
             python signal_engine.py || echo "Ciclo $i fallito: non blocco il loop, riprovo al prossimo giro."
-            if [ "$i" -lt 22 ]; then
-              sleep 890
+
+            now=$(date -u +%s)
+            next_boundary=$(( ( (now / 900) + 1 ) * 900 + 120 ))
+            sleep_for=$(( next_boundary - now ))
+            if [ "$(date -u +%s)" -ge "$run_until" ]; then
+              break
             fi
+            echo "Prossimo controllo tra $sleep_for secondi (alle $(date -u -d "@$next_boundary" +'%H:%M:%S UTC'))"
+            sleep "$sleep_for"
+            i=$((i + 1))
           done

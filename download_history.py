@@ -20,7 +20,7 @@ import requests
 
 from twelvedata_client import BASE_URL, _SYMBOL_MAP
 
-SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "EURGBP", "USDCHF", "AUDUSD"]
+SYMBOLS = ["USDJPY", "EURGBP", "USDCHF", "AUDUSD"]  # EURUSD/GBPUSD gia' scaricate
 CHUNK_DAYS = 45
 MONTHS_BACK = 6
 OUT_DIR = os.path.join(os.path.dirname(__file__), "historical_data_twelvedata")
@@ -52,7 +52,7 @@ def download_symbol(symbol, api_key):
         rows = _fetch_chunk(symbol, cursor, chunk_end, api_key)
         all_rows.extend(rows)
         cursor = chunk_end
-        time.sleep(1.0)  # margine ampio sotto 8 richieste/minuto
+        time.sleep(8.0)  # 8 richieste/minuto di limite: serve un vero margine, non 1s
 
     df = pd.DataFrame(all_rows)
     if df.empty:
