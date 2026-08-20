@@ -1,15 +1,26 @@
 name: Segnali forex
 
+# GitHub non rispetta con precisione le schedulazioni molto frequenti (ogni
+# 15 minuti): un test reale ha mostrato esecuzioni irregolari, circa una
+# all'ora invece di 4, con il rischio concreto di perdere segnali (un
+# ingresso mean-reversion scoperto un'ora dopo e' ormai inutile, il prezzo
+# si e' gia' mosso). Soluzione: un singolo job che resta acceso per ore e
+# controlla da solo ogni 15 minuti (loop interno, vedi sotto) - il trigger
+# esterno deve solo farlo ripartire ogni tanto, molto meno sensibile ai
+# ritardi di GitHub rispetto a un trigger ogni 15 minuti.
 on:
   schedule:
-    # 2 minuti dopo ogni chiusura di barra M15 (00/15/30/45), per dare tempo
-    # a Twelve Data di pubblicare la candela appena chiusa.
-    - cron: "2,17,32,47 * * * *"
+    # ogni 3 ore: il loop interno copre ~5h30 ad ogni avvio (vedi sotto),
+    # quindi c'e' ampio margine di sovrapposizione anche se questo trigger
+    # arriva in ritardo.
+    - cron: "3 */3 * * *"
   workflow_dispatch: {}  # permette anche un avvio manuale da GitHub, per test
 
 jobs:
   run-signal-engine:
     runs-on: ubuntu-latest
+    timeout-minutes: 350  # margine di sicurezza sotto il limite di 360 min (6h) di GitHub
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,11 +31,18 @@ jobs:
       - name: Installa le dipendenze
         run: pip install -r requirements.txt
 
-      - name: Esegui il motore dei segnali
+      - name: Esegui il motore dei segnali in loop (ogni ~15 minuti, per ~5h30 ad ogni avvio)
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEGNALI_API_KEY: ${{ secrets.SEGNALI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python signal_engine.py
+        run: |
+          for i in $(seq 1 22); do
+            echo "=== Ciclo $i/22 - $(date -u +'%Y-%m-%d %H:%M:%S UTC') ==="
+            python signal_engine.py || echo "Ciclo $i fallito: non blocco il loop, riprovo al prossimo giro."
+            if [ "$i" -lt 22 ]; then
+              sleep 890
+            fi
+          done
