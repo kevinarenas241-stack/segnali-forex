@@ -57,11 +57,13 @@ def _process_open_signal(symbol, open_pos, last, current_capital):
     close_signal(symbol, round(exit_price, decimals), round(pnl_eur, 2), round(pnl_pct, 3), reason)
 
     esito = "TARGET raggiunto" if reason == "MEAN_REVERSION_TARGET" else "STOP LOSS"
-    emoji = "✅" if pnl_eur >= 0 else "\U0001F534"
+    esito_emoji = "✅" if pnl_eur >= 0 else "❌"  # verde/rosso diversi dai pallini di direzione, per non confonderli con un segnale SHORT
     segno = "+" if pnl_eur >= 0 else ""
     send_message(
-        f"{emoji} <b>{symbol} CHIUSA</b> ({esito})\n"
-        f"Se avevi eseguito il segnale: {segno}{pnl_eur:.2f} EUR ({segno}{pnl_pct:.2f}%)\n"
+        f"\U0001F3C1 <b>OPERAZIONE CHIUSA — {symbol}</b>\n"
+        f"{esito_emoji} {esito}\n"
+        f"➖➖➖➖➖➖➖➖\n"
+        f"Risultato: {segno}{pnl_eur:.2f} EUR ({segno}{pnl_pct:.2f}%)\n"
         f"Uscita a {exit_price:.{decimals}f}"
     )
     print(f"[{symbol}] chiuso: {reason}, pnl={pnl_eur:.2f}EUR ({pnl_pct:.2f}%)")
@@ -105,8 +107,9 @@ def _process_new_signal(symbol, last, hour_utc, current_capital, active_params, 
     emoji = "\U0001F7E2" if direction == "LONG" else "\U0001F534"
     verbo = "COMPRA" if direction == "LONG" else "VENDI"
     send_message(
-        f"{emoji} <b>SEGNALE {symbol}</b>\n"
-        f"{verbo} a mercato (~{entry_price:.{decimals}f})\n"
+        f"\U0001F195 <b>NUOVO SEGNALE — {symbol}</b>\n"
+        f"{emoji} {verbo} a mercato (~{entry_price:.{decimals}f})\n"
+        f"➖➖➖➖➖➖➖➖\n"
         f"Stop loss: {stop_loss:.{decimals}f}\n"
         f"{lots_line}"
         f"Target: ritorno alla media mobile (dinamico, ti avviso io quando chiudere)"
