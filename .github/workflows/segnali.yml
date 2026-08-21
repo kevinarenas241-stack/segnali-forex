@@ -11,10 +11,17 @@ name: Segnali forex
 on:
   schedule:
     # ogni 3 ore: il loop interno copre ~5h30 ad ogni avvio (vedi sotto),
-    # quindi c'e' ampio margine di sovrapposizione anche se questo trigger
-    # arriva in ritardo.
+    # quindi c'e' ampio margine anche se questo trigger arriva in ritardo.
+    # Il blocco "concurrency" sotto impedisce pero' che due avvii finiscano
+    # per girare INSIEME (visto succedere davvero: piu' run in parallelo
+    # che si contendono le stesse chiamate a Twelve Data, causa piu'
+    # probabile dei 429 di quanto non sia il semplice burst di 6 richieste).
     - cron: "3 */3 * * *"
   workflow_dispatch: {}  # permette anche un avvio manuale da GitHub, per test
+
+concurrency:
+  group: segnali-signal-engine
+  cancel-in-progress: false  # non interrompe un run in corso: mette in coda il nuovo trigger, cosi' non gira mai piu' di un run alla volta
 
 jobs:
   run-signal-engine:
