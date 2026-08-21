@@ -24,6 +24,7 @@ from telegram_client import send_message
 from dashboard_client import get_status, open_signal, close_signal, heartbeat
 from mean_reversion import add_indicators, check_entry_signal, check_exit
 from ai_review import run_review_if_due
+from lot_size import suggested_lots
 
 SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "EURGBP", "USDCHF", "AUDUSD"]
 RISK_PCT = 0.003
@@ -77,7 +78,7 @@ def _process_open_signal(symbol, open_pos, last, current_capital):
         print(f"[{symbol}] revisione AI non riuscita (la chiusura resta comunque valida): {e}")
 
 
-def _process_new_signal(symbol, last, hour_utc, current_capital, active_params):
+def _process_new_signal(symbol, last, hour_utc, current_capital, active_params, prices):
     direction, stop_loss = check_entry_signal(
         last, hour_utc,
         rsi_oversold=active_params.get("rsi_oversold", 30),
@@ -94,12 +95,20 @@ def _process_new_signal(symbol, last, hour_utc, current_capital, active_params):
     decimals = _decimals(symbol)
     open_signal(symbol, direction, round(entry_price, decimals), round(stop_loss, decimals), current_capital)
 
+    try:
+        lots = suggested_lots(symbol, entry_price, stop_loss, current_capital, prices)
+        lots_line = f"Lotti suggeriti: {lots} (rischio ~0,3% del capitale, stima - verifica il margine libero su MT4)\n"
+    except Exception as e:
+        lots_line = ""
+        print(f"[{symbol}] calcolo lotti non riuscito (il segnale resta valido): {e}")
+
     emoji = "\U0001F7E2" if direction == "LONG" else "\U0001F534"
     verbo = "COMPRA" if direction == "LONG" else "VENDI"
     send_message(
         f"{emoji} <b>SEGNALE {symbol}</b>\n"
         f"{verbo} a mercato (~{entry_price:.{decimals}f})\n"
         f"Stop loss: {stop_loss:.{decimals}f}\n"
+        f"{lots_line}"
         f"Target: ritorno alla media mobile (dinamico, ti avviso io quando chiudere)"
     )
     print(f"[{symbol}] SEGNALE {direction} a {entry_price}, stop={stop_loss}")
@@ -114,16 +123,23 @@ def main():
     # arriva da qui, letto fresco ad ogni esecuzione.
     active_params = status.get("active_params", {})
 
+    # prezzi correnti, accumulati man mano - servono per convertire il
+    # valore del punto in EUR nel calcolo lotti (lot_size.py). EURUSD e'
+    # sempre il primo in SYMBOLS, quindi e' gia' disponibile quando serve
+    # per le altre coppie (nessuna richiesta extra all'API).
+    prices = {}
+
     for symbol in SYMBOLS:
         try:
             df = add_indicators(fetch_ohlc(symbol, interval="15min", outputsize=60))
             last = df.iloc[-1]
             hour_utc = last.name.hour
+            prices[symbol] = float(last["close"])
 
             if symbol in open_signals:
                 _process_open_signal(symbol, open_signals[symbol], last, current_capital)
             else:
-                _process_new_signal(symbol, last, hour_utc, current_capital, active_params)
+                _process_new_signal(symbol, last, hour_utc, current_capital, active_params, prices)
         except Exception as e:
             print(f"[{symbol}] ERRORE: {e}")
 

@@ -49,7 +49,7 @@ from telegram_client import send_message
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-sonnet-5"
 REVIEW_EVERY_N_NEW = 10
-APPLY_MIN_TRADES = 50
+APPLY_MIN_TRADES = 35
 
 # DEVONO restare identici ai limiti in api/segnali/segnali_config.php
 # (SEGNALI_PARAM_RANGES) - controllati qui PRIMA di chiamare l'endpoint,
