@@ -55,7 +55,10 @@ def check_entry_signal(last_row, hour_utc: int, weekday_utc: int = 0, rsi_overso
         return None, None
     if not (SESSION_START <= hour_utc < SESSION_END):
         return None, None
-    if weekday_utc == 5:  # sabato: il forex e' chiuso ovunque, eventuali barre sono dati stantii/sintetici, non prezzi reali
+    if weekday_utc in (5, 6):  # sabato e domenica: il forex riapre solo verso le 21-22h UTC di domenica
+        # (apertura di Sydney), ben oltre SESSION_END - quindi ogni ora di
+        # queste due giornate dentro la finestra 1h-20h e' comunque a mercato
+        # chiuso; eventuali barre sono dati stantii/sintetici, non prezzi reali
         return None, None
 
     close = last_row["close"]
