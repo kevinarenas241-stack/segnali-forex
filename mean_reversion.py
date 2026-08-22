@@ -8,7 +8,7 @@ parametri sono costanti locali.
 Entrata:
   LONG  quando close < banda inferiore  E  RSI < RSI_OVERSOLD
   SHORT quando close > banda superiore  E  RSI > RSI_OVERBOUGHT
-  (solo dentro la finestra di sessione 1h-20h UTC, gia' validata)
+  (solo dentro la finestra di sessione 1h-20h UTC, gia' validata; mai di sabato, mercato chiuso)
 
 Uscita:
   Target: ritorno alla banda centrale (dinamico, letto ogni barra).
@@ -40,7 +40,7 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def check_entry_signal(last_row, hour_utc: int, rsi_oversold: float = RSI_OVERSOLD,
+def check_entry_signal(last_row, hour_utc: int, weekday_utc: int = 0, rsi_oversold: float = RSI_OVERSOLD,
                         rsi_overbought: float = RSI_OVERBOUGHT, sl_atr_mult: float = SL_ATR_MULT):
     """Ritorna (direction, stop_loss) o (None, None). last_row: ultima riga
     del DataFrame arricchito da add_indicators (Serie pandas).
@@ -54,6 +54,8 @@ def check_entry_signal(last_row, hour_utc: int, rsi_oversold: float = RSI_OVERSO
     if pd.isna(last_row["bb_lower"]) or pd.isna(last_row["bb_upper"]) or pd.isna(last_row["rsi"]) or pd.isna(last_row["atr"]):
         return None, None
     if not (SESSION_START <= hour_utc < SESSION_END):
+        return None, None
+    if weekday_utc == 5:  # sabato: il forex e' chiuso ovunque, eventuali barre sono dati stantii/sintetici, non prezzi reali
         return None, None
 
     close = last_row["close"]

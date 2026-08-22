@@ -85,7 +85,7 @@ class SegnaliBacktestEngine:
                     continue
                 bar = df.loc[t]
                 direction, stop_loss = check_entry_signal(
-                    bar, t.hour, rsi_oversold=self.rsi_oversold,
+                    bar, t.hour, t.weekday(), rsi_oversold=self.rsi_oversold,
                     rsi_overbought=self.rsi_overbought, sl_atr_mult=self.sl_atr_mult,
                 )
                 if direction is None:

@@ -80,9 +80,9 @@ def _process_open_signal(symbol, open_pos, last, current_capital):
         print(f"[{symbol}] revisione AI non riuscita (la chiusura resta comunque valida): {e}")
 
 
-def _process_new_signal(symbol, last, hour_utc, current_capital, active_params, prices):
+def _process_new_signal(symbol, last, hour_utc, weekday_utc, current_capital, active_params, prices):
     direction, stop_loss = check_entry_signal(
-        last, hour_utc,
+        last, hour_utc, weekday_utc,
         rsi_oversold=active_params.get("rsi_oversold", 30),
         rsi_overbought=active_params.get("rsi_overbought", 70),
         sl_atr_mult=active_params.get("sl_atr_mult", 1.5),
@@ -137,12 +137,13 @@ def main():
             df = add_indicators(fetch_ohlc(symbol, interval="15min", outputsize=60))
             last = df.iloc[-1]
             hour_utc = last.name.hour
+            weekday_utc = last.name.weekday()
             prices[symbol] = float(last["close"])
 
             if symbol in open_signals:
                 _process_open_signal(symbol, open_signals[symbol], last, current_capital)
             else:
-                _process_new_signal(symbol, last, hour_utc, current_capital, active_params, prices)
+                _process_new_signal(symbol, last, hour_utc, weekday_utc, current_capital, active_params, prices)
         except Exception as e:
             print(f"[{symbol}] ERRORE: {e}")
 
